@@ -1,0 +1,189 @@
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+
+#define NAME_SIZE 50
+#define EMAIL_SIZE 50
+#define PERSON_SIZE (NAME_SIZE + sizeof(int) + EMAIL_SIZE)
+#define HEADER_SIZE (sizeof(int) * 2 + NAME_SIZE + sizeof(int) + EMAIL_SIZE)
+
+void displayMenu() {
+    printf("\n=== Contact Book ===\n");
+    printf("1 - Add Person\n");
+    printf("2 - Remove Person\n");
+    printf("3 - Search Person\n");
+    printf("4 - List All\n");
+    printf("5 - Exit\n");
+    printf("Choose an option: ");
+}
+
+void addPerson(void **pBuffer) {
+    void *buffer = *pBuffer;
+
+    int *pCount = (int *)(buffer);
+    char *tempName = (char *)(buffer + sizeof(int) * 1);
+    int *tempAge = (int *)(buffer + sizeof(int) * 1 + NAME_SIZE);
+    char *tempEmail = (char *)(buffer + sizeof(int) * 1 + NAME_SIZE + sizeof(int));
+
+    printf("Enter name: ");
+    fgets(tempName, NAME_SIZE, stdin);
+    tempName[strcspn(tempName, "\n")] = 0;
+
+    while (1) {
+        printf("Enter age: ");
+        if (scanf("%d", tempAge) != 1) {
+            printf("Invalid input for age. Please enter a number.\n");
+            while (getchar() != '\n');
+        } else {
+            while (getchar() != '\n');
+            break;
+        }
+    }
+
+    printf("Enter email: ");
+    fgets(tempEmail, EMAIL_SIZE, stdin);
+    tempEmail[strcspn(tempEmail, "\n")] = 0;
+
+    *pBuffer = realloc(buffer, HEADER_SIZE + (*pCount + 1) * PERSON_SIZE);
+    buffer = *pBuffer;
+
+    pCount = (int *)(buffer);
+    tempName = (char *)(buffer + sizeof(int) * 1);
+    tempAge = (int *)(buffer + sizeof(int) * 1 + NAME_SIZE);
+    tempEmail = (char *)(buffer + sizeof(int) * 1 + NAME_SIZE + sizeof(int));
+
+    char *newPerson = (char *)(buffer + HEADER_SIZE + (*pCount) * PERSON_SIZE);
+    memcpy(newPerson, tempName, NAME_SIZE);
+    memcpy(newPerson + NAME_SIZE, tempAge, sizeof(int));
+    memcpy(newPerson + NAME_SIZE + sizeof(int), tempEmail, EMAIL_SIZE);
+
+    (*pCount)++;
+    printf("Person added successfully!\n");
+}
+
+void listPeople(void *pBuffer) {
+    int *pCount = (int *)pBuffer;
+    if (*pCount == 0) {
+        printf("Contact book is empty!\n");
+        return;
+    }
+
+    for (int i = 0; i < *pCount; i++) {
+        char *person = (char *)(pBuffer + HEADER_SIZE + i * PERSON_SIZE);
+        char *name = person;
+        int *age = (int *)(person + NAME_SIZE);
+        char *email = person + NAME_SIZE + sizeof(int);
+
+        printf("\n%d. Name: %s\n", i + 1, name);
+        printf("   Age: %d\n", *age);
+        printf("   Email: %s\n", email);
+    }
+}
+
+void searchPerson(void *pBuffer) {
+    int *pCount = (int *)pBuffer;
+    char *tempName = (char *)(pBuffer + sizeof(int));
+
+    if (*pCount == 0) {
+        printf("Contact book is empty!\n");
+        return;
+    }
+
+    printf("Enter name to search: ");
+    fgets(tempName, NAME_SIZE, stdin);
+    tempName[strcspn(tempName, "\n")] = 0;
+
+    for (int i = 0; i < *pCount; i++) {
+        char *person = (char *)(pBuffer + HEADER_SIZE + i * PERSON_SIZE);
+        char *name = person;
+        int *age = (int *)(person + NAME_SIZE);
+        char *email = person + NAME_SIZE + sizeof(int);
+
+        if (strcmp(name, tempName) == 0) {
+            printf("\nFound: %s, Age: %d, Email: %s\n", name, *age, email);
+            return;
+        }
+    }
+    printf("Person not found!\n");
+}
+
+void removePerson(void **pBuffer) {
+    void *buffer = *pBuffer;
+    int *pCount = (int *)buffer;
+    char *tempName = (char *)(buffer + sizeof(int));
+
+    if (*pCount == 0) {
+        printf("Contact book is empty!\n");
+        return;
+    }
+
+    printf("Enter name to remove: ");
+    fgets(tempName, NAME_SIZE, stdin);
+    tempName[strcspn(tempName, "\n")] = 0;
+
+    int found = -1;
+    for (int i = 0; i < *pCount; i++) {
+        char *person = (char *)(buffer + HEADER_SIZE + i * PERSON_SIZE);
+        char *name = person;
+        if (strcmp(name, tempName) == 0) {
+            found = i;
+            break;
+        }
+    }
+
+    if (found == -1) {
+        printf("Person not found!\n");
+        return;
+    }
+
+    for (int i = found; i < *pCount - 1; i++) {
+        char *dest = (char *)(buffer + HEADER_SIZE + i * PERSON_SIZE);
+        char *src = (char *)(buffer + HEADER_SIZE + (i + 1) * PERSON_SIZE);
+        memcpy(dest, src, PERSON_SIZE);
+    }
+
+    (*pCount)--;
+    *pBuffer = realloc(*pBuffer, HEADER_SIZE + (*pCount) * PERSON_SIZE);
+    printf("Person removed successfully!\n");
+}
+
+int main() {
+    void *pBuffer = malloc(HEADER_SIZE);
+    if (!pBuffer) return 1;
+    memset(pBuffer, 0, HEADER_SIZE);
+
+    int *pCount = (int *)pBuffer;
+    int *pOption = (int *)(pBuffer + HEADER_SIZE - sizeof(int));
+
+    while (1) {
+        displayMenu();
+        if (scanf("%d", pOption) != 1) {
+            printf("Invalid input!\n");
+            while (getchar() != '\n');
+            continue;
+        }
+        getchar();
+
+        switch (*pOption) {
+            case 1:
+                addPerson(&pBuffer);
+                break;
+            case 2:
+                removePerson(&pBuffer);
+                break;
+            case 3:
+                searchPerson(pBuffer);
+                break;
+            case 4:
+                listPeople(pBuffer);
+                break;
+            case 5:
+                free(pBuffer);
+                printf("Goodbye!\n");
+                return 0;
+            default:
+                printf("Invalid option. Try again.\n");
+        }
+    }
+    return 0;
+}
